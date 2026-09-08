@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "struts",
+  "version": "${version}",
+  "name": "Create Fly: Strut Your Stuff (Unofficial Port)",
+  "description": "Strut Your Stuff port for Create Fly 26.2. Girder strut library for blocks that span two positions.",
+  "authors": [
+    "Cake",
+    "chaevsfe"
+  ],
+  "contributors": [
+    "chaevsfe"
+  ],
+  "contact": {
+    "homepage": "https://github.com/chaevsfe/StrutYourStuff",
+    "sources": "https://github.com/chaevsfe/StrutYourStuff",
+    "issues": "https://github.com/chaevsfe/StrutYourStuff/issues",
+    "upstream": "https://modrinth.com/mod/strut-your-stuff"
+  },
+  "license": [
+    "MIT"
+  ],
+  "icon": "assets/struts/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.cake.struts.fabric.StrutsFabric"
+    ],
+    "client": [
+      "com.cake.struts.fabric.StrutsClientFabric"
+    ],
+    "create_plugin": [
+      "com.cake.struts.fabric.StrutsCreatePlugin"
+    ]
+  },
+  "depends": {
+    "minecraft": "${minecraft_dependency_version}",
+    "fabricloader": ">=${fabric_loader_version}",
+    "fabric-api": "*",
+    "create": "${create_fabric_version_range}",
+    "java": ">=25"
+  },
+  "breaks": {
+    "sable": "*",
+    "sable-companion": "*"
+  }
+}

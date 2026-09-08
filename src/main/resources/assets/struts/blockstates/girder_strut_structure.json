@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "struts:block/girder_strut_structure"
+    }
+  }
+}

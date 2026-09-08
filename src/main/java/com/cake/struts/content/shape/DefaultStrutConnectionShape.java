@@ -1,0 +1,256 @@
+package com.cake.struts.content.shape;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.cake.struts.compat.sable.ClientSubLevelAccess;
+import com.cake.struts.compat.sable.math.Pose3dc;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class DefaultStrutConnectionShape implements StrutConnectionShape {
+
+    private static final double INFLATE_PIXELS = 0.0;
+    private static final double SURFACE_CLIP_EPSILON = 1e-4;
+
+    private final Vec3 start, end;
+    private final double halfWidth, halfHeight;
+    private final AABB bounds;
+
+    private final SurfaceClippingHelper.SurfacePlane fromSurfacePlane;
+    private final SurfaceClippingHelper.SurfacePlane toSurfacePlane;
+
+    private final Vec3 u, v, tangent;
+    private final List<OutlineEdge> outlineEdges;
+    private final boolean hasGeometry;
+
+    public DefaultStrutConnectionShape(final Vec3 fromAttachment, final Vec3 toAttachment,
+                                       final double halfWidth, final double halfHeight,
+                                       final BlockPos fromPos, final Direction fromFacing,
+                                       final BlockPos toPos, final Direction toFacing) {
+        this.halfWidth = halfWidth + INFLATE_PIXELS;
+        this.halfHeight = halfHeight + INFLATE_PIXELS;
+
+        this.fromSurfacePlane = SurfaceClippingHelper.surfacePlane(fromPos, fromFacing);
+        this.toSurfacePlane = SurfaceClippingHelper.surfacePlane(toPos, toFacing);
+
+        this.tangent = SurfaceClippingHelper.safeDirection(toAttachment.subtract(fromAttachment));
+
+        // Extend endpoints by 0.5 mathematically and we clip after using planes
+        this.start = fromAttachment.subtract(this.tangent.scale(0.5));
+        this.end = toAttachment.add(this.tangent.scale(0.5));
+
+        this.u = SurfaceClippingHelper.perpendicularUnit(this.tangent);
+        this.v = SurfaceClippingHelper.safeDirection(this.tangent.cross(this.u));
+
+        final List<Vec3> rawStart = SurfaceClippingHelper.getCorners(
+                this.start,
+                this.u,
+                this.v,
+                (float) this.halfWidth,
+                (float) this.halfHeight
+        );
+        final List<Vec3> rawEnd = SurfaceClippingHelper.getCorners(this.end, this.u, this.v, (float) this.halfWidth, (float) this.halfHeight);
+
+        final List<List<Vec3>> clippedFaces = this.clipFaces(rawStart, rawEnd);
+        this.outlineEdges = this.buildOutlineEdges(clippedFaces);
+        this.hasGeometry = !this.outlineEdges.isEmpty();
+
+        this.bounds = this.computeBounds(clippedFaces);
+    }
+
+    @Nullable
+    @Override
+    public Vec3 intersect(final Vec3 rayFrom, final Vec3 rayTo) {
+        if (!this.hasGeometry) {
+            return null;
+        }
+
+        if (!this.bounds.contains(rayFrom) && this.bounds.clip(rayFrom, rayTo).isEmpty()) {
+            return null;
+        }
+
+        final Vec3 rayDir = rayTo.subtract(rayFrom);
+        if (rayDir.lengthSqr() < SurfaceClippingHelper.MIN_LENGTH_SQR) {
+            return null;
+        }
+
+        final Vec3 segment = this.end.subtract(this.start);
+        final double segmentLength = segment.length();
+        final Vec3 segmentCenter = this.start.add(segment.scale(0.5));
+        final double halfLength = segmentLength * 0.5;
+
+        final double t = SurfaceClippingHelper.intersectRayWithObb(
+                rayFrom,
+                rayDir,
+                segmentCenter,
+                this.tangent,
+                this.u,
+                this.v,
+                halfLength,
+                this.halfWidth,
+                this.halfHeight
+        );
+        if (Double.isNaN(t)) {
+            return null;
+        }
+
+        final Vec3 hit = rayFrom.add(rayDir.scale(t));
+        if (!SurfaceClippingHelper.isInside(hit, this.fromSurfacePlane, SURFACE_CLIP_EPSILON)) return null;
+        if (!SurfaceClippingHelper.isInside(hit, this.toSurfacePlane, SURFACE_CLIP_EPSILON)) return null;
+
+        return hit;
+    }
+
+    @Override
+    public void drawOutline(final PoseStack ms,
+                            final VertexConsumer vb,
+                            final Vec3 camera,
+                            final int color,
+                            final ClientSubLevelAccess clientSubLevelAccess) {
+        if (!this.hasGeometry) {
+            return;
+        }
+
+        final Pose3dc pose3dc = clientSubLevelAccess != null ? clientSubLevelAccess.renderPose() : null;
+        for (final OutlineEdge edge : this.outlineEdges) {
+            line(
+                    vb,
+                    ms,
+                    (pose3dc != null ? pose3dc.transformPosition(edge.from()) : edge.from()).subtract(camera),
+                    (pose3dc != null ? pose3dc.transformPosition(edge.to()) : edge.to()).subtract(camera),
+                    color
+            );
+        }
+    }
+
+    @Override
+    public BlockPos getSubLevelReferencePosition() {
+        return BlockPos.containing(this.fromSurfacePlane.point());
+    }
+
+    private List<List<Vec3>> clipFaces(final List<Vec3> rawStart, final List<Vec3> rawEnd) {
+        final List<List<Vec3>> faces = new ArrayList<>();
+
+        faces.add(List.of(rawStart.get(0), rawStart.get(1), rawStart.get(2), rawStart.get(3)));
+        faces.add(List.of(rawEnd.get(0), rawEnd.get(1), rawEnd.get(2), rawEnd.get(3)));
+        faces.add(List.of(rawStart.get(0), rawStart.get(1), rawEnd.get(1), rawEnd.get(0)));
+        faces.add(List.of(rawStart.get(1), rawStart.get(2), rawEnd.get(2), rawEnd.get(1)));
+        faces.add(List.of(rawStart.get(2), rawStart.get(3), rawEnd.get(3), rawEnd.get(2)));
+        faces.add(List.of(rawStart.get(3), rawStart.get(0), rawEnd.get(0), rawEnd.get(3)));
+
+        final List<List<Vec3>> clippedToFrom = this.clipFaceListToPlane(faces, this.fromSurfacePlane);
+        return this.clipFaceListToPlane(clippedToFrom, this.toSurfacePlane);
+    }
+
+    private List<List<Vec3>> clipFaceListToPlane(final List<List<Vec3>> faces,
+                                                 final SurfaceClippingHelper.SurfacePlane plane) {
+        final List<List<Vec3>> result = new ArrayList<>(faces.size());
+        for (final List<Vec3> face : faces) {
+            final List<Vec3> clipped = SurfaceClippingHelper.clipPolygonToPlane(face, plane, SURFACE_CLIP_EPSILON);
+            if (clipped.size() >= 3) {
+                result.add(clipped);
+            }
+        }
+        return result;
+    }
+
+    private List<OutlineEdge> buildOutlineEdges(final List<List<Vec3>> faces) {
+        final List<OutlineEdge> edges = new ArrayList<>();
+        for (final List<Vec3> face : faces) {
+            for (int i = 0; i < face.size(); i++) {
+                final Vec3 from = face.get(i);
+                final Vec3 to = face.get((i + 1) % face.size());
+                this.addUniqueEdge(edges, from, to);
+            }
+        }
+        return edges;
+    }
+
+    private void addUniqueEdge(final List<OutlineEdge> edges, final Vec3 from, final Vec3 to) {
+        if (from.distanceToSqr(to) < SurfaceClippingHelper.MIN_LENGTH_SQR) {
+            return;
+        }
+
+        for (final OutlineEdge edge : edges) {
+            final boolean sameDirection = this.pointsEqual(edge.from(), from) && this.pointsEqual(edge.to(), to);
+            final boolean oppositeDirection = this.pointsEqual(edge.from(), to) && this.pointsEqual(edge.to(), from);
+            if (sameDirection || oppositeDirection) {
+                return;
+            }
+        }
+
+        edges.add(new OutlineEdge(from, to));
+    }
+
+    private boolean pointsEqual(final Vec3 a, final Vec3 b) {
+        return a.distanceToSqr(b) < SurfaceClippingHelper.MIN_LENGTH_SQR;
+    }
+
+    private AABB computeBounds(final List<List<Vec3>> faces) {
+        if (faces.isEmpty()) {
+            AABB box = new AABB(this.start, this.start).inflate(Math.max(this.halfWidth, this.halfHeight));
+            box = box.minmax(new AABB(this.end, this.end).inflate(Math.max(this.halfWidth, this.halfHeight)));
+            return box;
+        }
+
+        Vec3 first = null;
+        for (final List<Vec3> face : faces) {
+            if (!face.isEmpty()) {
+                first = face.get(0);
+                break;
+            }
+        }
+
+        if (first == null) {
+            AABB box = new AABB(this.start, this.start).inflate(Math.max(this.halfWidth, this.halfHeight));
+            box = box.minmax(new AABB(this.end, this.end).inflate(Math.max(this.halfWidth, this.halfHeight)));
+            return box;
+        }
+
+        AABB box = new AABB(first, first);
+        for (final List<Vec3> face : faces) {
+            for (final Vec3 point : face) {
+                box = box.minmax(new AABB(point, point));
+            }
+        }
+        return box;
+    }
+
+    private record OutlineEdge(Vec3 from, Vec3 to) {
+    }
+
+    private static void line(final VertexConsumer vb, final PoseStack ms,
+                             final Vec3 a, final Vec3 b, final int color) {
+        final PoseStack.Pose pose = ms.last();
+        final Matrix4f poseMatrix = pose.pose();
+
+        final float dx = (float) (b.x - a.x);
+        final float dy = (float) (b.y - a.y);
+        final float dz = (float) (b.z - a.z);
+        final float len = Mth.sqrt(dx * dx + dy * dy + dz * dz);
+        final float nx = len > 0 ? dx / len : 0f;
+        final float ny = len > 0 ? dy / len : 1f;
+        final float nz = len > 0 ? dz / len : 0f;
+
+        final float r = ((color >> 16) & 0xFF) / 255f;
+        final float g = ((color >> 8) & 0xFF) / 255f;
+        final float bl = (color & 0xFF) / 255f;
+        final float alpha = ((color >> 24) & 0xFF) / 255f;
+
+        vb.addVertex(poseMatrix, (float) a.x, (float) a.y, (float) a.z)
+                .setColor(r, g, bl, alpha)
+                .setNormal(pose, nx, ny, nz);
+        vb.addVertex(poseMatrix, (float) b.x, (float) b.y, (float) b.z)
+                .setColor(r, g, bl, alpha)
+                .setNormal(pose, nx, ny, nz);
+    }
+
+}

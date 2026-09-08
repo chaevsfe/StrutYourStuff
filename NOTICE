@@ -1,0 +1,25 @@
+Strut Your Stuff - unofficial Fabric / Create Fly port for Minecraft 26.2.
+
+Upstream: https://github.com/cakeGit/StrutYourStuff (Cake)
+Upstream distribution: https://modrinth.com/mod/strut-your-stuff
+This distribution: a modification by chaevsfe, ported from upstream commit 8c6ad01
+(mod_version 1.3.1, NeoForge / Minecraft 1.21.1) to Fabric / Create Fly on Minecraft 26.2.
+Port repository: https://github.com/chaevsfe/StrutYourStuff
+
+Licence grant
+
+The upstream repository contains no LICENCE file and no copyright line. Every
+distributed upstream artefact declares MIT: src/main/resources/META-INF/neoforge.mods.toml
+line 3 is license = "MIT", and the Modrinth project field is "MIT License (MIT)".
+This port therefore relies on that declared MIT grant. Because upstream wrote no
+notice for this port to preserve, the accompanying LICENSE file is the standard MIT
+text with a copyright line constructed for this distribution naming the upstream
+author (Cake / cakeGit, first commit 2026-03-02). It is not a notice taken from
+upstream, and it does not enlarge or restrict the grant upstream declared.
+
+Third-party stand-ins written for this port
+
+The classes under com.cake.struts.compat.sable are inert stubs written for this port.
+They reproduce only the method signatures Strut Your Stuff calls and contain no code
+from Sable Companion (dev.ryanhcode.sable); the real mod is declared incompatible in
+fabric.mod.json.

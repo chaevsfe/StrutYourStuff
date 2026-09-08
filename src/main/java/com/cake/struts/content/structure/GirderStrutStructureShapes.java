@@ -1,0 +1,258 @@
+package com.cake.struts.content.structure;
+
+import com.cake.struts.content.StrutModelType;
+import com.cake.struts.internal.util.ChunkedMap;
+import com.cake.struts.internal.util.LevelSafeStorage;
+import com.cake.struts.registry.StrutBlocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Handler and storage for all the connections between girder struts in a level.
+ */
+public class GirderStrutStructureShapes {
+
+    private static final LevelSafeStorage<ShapeRegistry> STORAGE = new LevelSafeStorage<>(ShapeRegistry::new);
+
+    public static void registerConnection(final Level level, final BlockPos from, final Direction fromFacing, final BlockPos to, final Direction toFacing, final StrutModelType modelType) {
+        STORAGE.getForLevel(level).registerConnection(level, from, fromFacing, to, toFacing, modelType);
+    }
+
+    public static void unregisterConnection(final Level level, final BlockPos a, final BlockPos b) {
+        STORAGE.getForLevel(level).unregisterConnection(level, new ConnectionKey(a, b));
+    }
+
+    public static VoxelShape getShape(final Level level, final BlockPos pos) {
+        return STORAGE.getForLevel(level).getShape(pos);
+    }
+
+    public static VoxelShape getOutlineShape(final Level level, final BlockPos pos, final CollisionContext context) {
+        return STORAGE.getForLevel(level).getOutlineShape(pos, context);
+    }
+
+    public static @Nullable ConnectionKey getTargetedConnection(final Level level, final BlockPos pos, final Vec3 origin, final Vec3 direction) {
+        return STORAGE.getForLevel(level).getTargetedConnection(pos, origin, direction);
+    }
+
+    public static Set<ConnectionKey> getConnectionsAt(final Level level, final BlockPos pos) {
+        return STORAGE.getForLevel(level).getConnectionsAt(pos);
+    }
+
+    public static void removePositionData(final Level level, final BlockPos pos) {
+        STORAGE.getForLevel(level).removePositionData(pos);
+    }
+
+    public static boolean hasPositionData(final Level level, final BlockPos pos) {
+        return STORAGE.getForLevel(level).hasPositionData(pos);
+    }
+
+    public static Set<BlockPos> getStructurePositionsForConnectionsAt(final Level level, final BlockPos pos) {
+        return STORAGE.getForLevel(level).getStructurePositionsForConnectionsAt(pos);
+    }
+
+    public static void restoreMissingStructureBlocksAt(final Level level, final BlockPos pos) {
+        STORAGE.getForLevel(level).restoreMissingStructureBlocksAt(level, pos);
+    }
+
+    public static void queueRestoreFromBreak(final Level level, final BlockPos pos) {
+        STORAGE.getForLevel(level).queueRestoreFromBreak(pos);
+    }
+
+    public static void flushQueuedRestores(final Level level) {
+        STORAGE.getForLevel(level).flushQueuedRestores(level);
+    }
+
+    public static boolean placeStructureBlockIfPossible(final Level level, final BlockPos pos) {
+        final BlockState currentState = level.getBlockState(pos);
+        if (currentState.getBlock() == StrutBlocks.GIRDER_STRUT_STRUCTURE) {
+            return true;
+        }
+        if (!currentState.canBeReplaced()) {
+            return false;
+        }
+
+        final FluidState fluidState = level.getFluidState(pos);
+        final boolean waterlogged = fluidState.getType() == Fluids.WATER;
+        BlockState structureState = StrutBlocks.GIRDER_STRUT_STRUCTURE.defaultBlockState();
+        if (structureState.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            structureState = structureState.setValue(BlockStateProperties.WATERLOGGED, waterlogged);
+        }
+
+        return level.setBlock(pos, structureState, Block.UPDATE_ALL);
+    }
+
+    private static class ShapeRegistry {
+        private final ChunkedMap<GirderStrutConnectionShape> connectionsByChunk;
+        private final Map<ConnectionKey, GirderStrutConnectionShape> connectionsByKey = new HashMap<>();
+        private final Map<BlockPos, PositionData> shapesByPosition = new HashMap<>();
+        private final Set<BlockPos> queuedRestores = new LinkedHashSet<>();
+
+        private ShapeRegistry(final Level level) {
+            this.connectionsByChunk = new ChunkedMap<>(level) {
+                @Override
+                protected void onChunkEvicted(final ChunkPos chunk, final List<GirderStrutConnectionShape> evictedObjects) {
+                    for (final GirderStrutConnectionShape connectionShape : evictedObjects) {
+                        for (final BlockPos position : connectionShape.geometry().getPositions()) {
+                            if (new ChunkPos(net.minecraft.core.SectionPos.blockToSectionCoord(position.getX()), net.minecraft.core.SectionPos.blockToSectionCoord(position.getZ())).equals(chunk)) {
+                                final PositionData positionData = ShapeRegistry.this.shapesByPosition.get(position);
+                                if (positionData != null) {
+                                    positionData.remove(connectionShape.key());
+                                    if (positionData.perConnectionShapes.isEmpty()) {
+                                        ShapeRegistry.this.shapesByPosition.remove(position);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        void registerConnection(final Level level, final BlockPos from, final Direction fromFacing, final BlockPos to, final Direction toFacing, final StrutModelType modelType) {
+            final ConnectionKey key = new ConnectionKey(from, to);
+            if (this.connectionsByKey.containsKey(key)) {
+                return;
+            }
+
+            final BlockyStrutLineGeometry geometry = new BlockyStrutLineGeometry(from, fromFacing, to, toFacing,
+                    modelType.shapeSizeXPixels(), modelType.shapeSizeYPixels(), modelType.voxelShapeResolutionPixels());
+            final Set<ChunkPos> chunks = new HashSet<>();
+            for (final BlockPos pos : geometry.getPositions()) {
+                chunks.add(new ChunkPos(net.minecraft.core.SectionPos.blockToSectionCoord(pos.getX()), net.minecraft.core.SectionPos.blockToSectionCoord(pos.getZ())));
+            }
+            final GirderStrutConnectionShape shapeObj = new GirderStrutConnectionShape(key, geometry, chunks.toArray(new ChunkPos[0]));
+            this.connectionsByKey.put(key, shapeObj);
+            this.connectionsByChunk.add(shapeObj);
+
+            for (final BlockPos pos : geometry.getPositions()) {
+                if (!level.isLoaded(pos)) continue;
+
+                final VoxelShape shape = geometry.getShapeForPosition(pos);
+                if (shape.isEmpty()) continue;
+
+                final PositionData pd = this.shapesByPosition.computeIfAbsent(pos, $ -> new PositionData());
+                final boolean wasEmpty = pd.perConnectionShapes.isEmpty();
+                pd.add(key, shape);
+
+                if (!pos.equals(from) && !pos.equals(to) && wasEmpty && !level.isClientSide()) {
+                    placeStructureBlockIfPossible(level, pos);
+                }
+            }
+        }
+
+        void unregisterConnection(final Level level, final ConnectionKey key) {
+            final GirderStrutConnectionShape found = this.connectionsByKey.remove(key);
+            if (found == null) return;
+
+            this.connectionsByChunk.remove(found);
+
+            for (final BlockPos pos : found.geometry().getPositions()) {
+                final PositionData pd = this.shapesByPosition.get(pos);
+                if (pd != null) {
+                    pd.remove(key);
+                    if (pd.perConnectionShapes.isEmpty()) {
+                        if (!level.isLoaded(pos)) continue;
+
+                        this.shapesByPosition.remove(pos);
+                        if (!level.isClientSide() && level.getBlockState(pos).getBlock() == StrutBlocks.GIRDER_STRUT_STRUCTURE) {
+                            level.removeBlock(pos, false);
+                        }
+                    }
+                }
+            }
+        }
+
+        VoxelShape getShape(final BlockPos pos) {
+            final PositionData pd = this.shapesByPosition.get(pos);
+            return pd == null ? Shapes.empty() : pd.mergedShape;
+        }
+
+        VoxelShape getOutlineShape(final BlockPos pos, final CollisionContext context) {
+            final PositionData pd = this.shapesByPosition.get(pos);
+            return pd == null ? Shapes.empty() : pd.getOutlineShape(pos, context);
+        }
+
+        @Nullable ConnectionKey getTargetedConnection(final BlockPos pos, final Vec3 origin, final Vec3 direction) {
+            final PositionData pd = this.shapesByPosition.get(pos);
+            return pd == null ? null : pd.getTargetedConnection(pos, origin, direction);
+        }
+
+        Set<ConnectionKey> getConnectionsAt(final BlockPos pos) {
+            final PositionData pd = this.shapesByPosition.get(pos);
+            return pd == null ? Set.of() : Set.copyOf(pd.perConnectionShapes.keySet());
+        }
+
+        void removePositionData(final BlockPos pos) {
+            this.shapesByPosition.remove(pos);
+        }
+
+        boolean hasPositionData(final BlockPos pos) {
+            return this.shapesByPosition.containsKey(pos);
+        }
+
+        Set<BlockPos> getStructurePositionsForConnectionsAt(final BlockPos pos) {
+            final PositionData positionData = this.shapesByPosition.get(pos);
+            if (positionData == null) {
+                return Set.of();
+            }
+
+            final Set<BlockPos> structurePositions = new LinkedHashSet<>();
+            for (final ConnectionKey key : positionData.perConnectionShapes.keySet()) {
+                final GirderStrutConnectionShape connectionShape = this.connectionsByKey.get(key);
+                if (connectionShape == null) {
+                    continue;
+                }
+
+                for (final BlockPos connectionPos : connectionShape.geometry().getPositions()) {
+                    if (!connectionPos.equals(key.a())
+                            && !connectionPos.equals(key.b())
+                            && this.shapesByPosition.containsKey(connectionPos)) {
+                        structurePositions.add(connectionPos);
+                    }
+                }
+            }
+            return Set.copyOf(structurePositions);
+        }
+
+        void restoreMissingStructureBlocksAt(final Level level, final BlockPos pos) {
+            for (final BlockPos structurePos : this.getStructurePositionsForConnectionsAt(pos)) {
+                placeStructureBlockIfPossible(level, structurePos);
+            }
+        }
+
+        void queueRestoreFromBreak(final BlockPos pos) {
+            this.queuedRestores.add(new BlockPos(pos));
+        }
+
+        void flushQueuedRestores(final Level level) {
+            if (this.queuedRestores.isEmpty()) {
+                return;
+            }
+
+            final Set<BlockPos> positionsToRestore = Set.copyOf(this.queuedRestores);
+            this.queuedRestores.clear();
+            for (final BlockPos pos : positionsToRestore) {
+                this.restoreMissingStructureBlocksAt(level, pos);
+            }
+        }
+    }
+}
