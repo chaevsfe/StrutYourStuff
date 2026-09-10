@@ -40,6 +40,10 @@
     "create": "${create_fabric_version_range}",
     "java": ">=25"
   },
+  "suggests": {
+    "createreiviewer": "*",
+    "roughlyenoughitems": "*"
+  },
   "breaks": {
     "sable": "*",
     "sable-companion": "*"
