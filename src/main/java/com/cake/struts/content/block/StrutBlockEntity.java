@@ -28,6 +28,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -73,15 +74,18 @@ public class StrutBlockEntity extends BlockEntity implements IAntiClippedShadowL
         }
         if (this.checkNextTick && !this.level.isClientSide()) {
             this.checkNextTick = false;
-            for (final GirderConnectionNode conn : this.connections) {
+            final List<BlockPos> invalidPeers = new ArrayList<>();
+            for (final GirderConnectionNode conn : List.copyOf(this.connections)) {
                 final BlockPos other = conn.absoluteFrom(this.getBlockPos());
                 if (!this.level.isLoaded(other)) continue;
-                if ((this.level.getBlockEntity(other) instanceof final StrutBlockEntity otherBE)) {
-                    if (otherBE.connections.stream().anyMatch(c -> c.absoluteFrom(other).equals(this.getBlockPos()))) {
-                        return;
-                    }
+                if (this.level.getBlockEntity(other) instanceof final StrutBlockEntity otherBE
+                        && otherBE.connections.stream().anyMatch(c -> c.absoluteFrom(other).equals(this.getBlockPos()))) {
+                    continue;
                 }
-                this.removeConnection(other);
+                invalidPeers.add(other);
+            }
+            for (final BlockPos other : invalidPeers) {
+                this.detachConnection(other);
             }
             this.removeIfEmpty();
         }
@@ -167,6 +171,11 @@ public class StrutBlockEntity extends BlockEntity implements IAntiClippedShadowL
     }
 
     public void removeConnection(final BlockPos pos, final boolean dropIfEmpty) {
+        this.detachConnection(pos);
+        this.removeIfEmpty(dropIfEmpty);
+    }
+
+    private void detachConnection(final BlockPos pos) {
         GirderConnectionNode toRemove = null;
         final BlockPos relative = pos.subtract(this.getBlockPos());
         for (final GirderConnectionNode data : this.connections) {
@@ -182,7 +191,6 @@ public class StrutBlockEntity extends BlockEntity implements IAntiClippedShadowL
             }
             this.notifyModelChange();
         }
-        this.removeIfEmpty(dropIfEmpty);
     }
 
     private void removeIfEmpty() {
