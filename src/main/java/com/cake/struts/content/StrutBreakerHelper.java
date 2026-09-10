@@ -2,8 +2,10 @@ package com.cake.struts.content;
 
 import com.cake.struts.content.block.StrutBlock;
 import com.cake.struts.content.block.StrutBlockEntity;
+import com.cake.struts.content.connection.GirderConnectionNode;
 import com.cake.struts.content.structure.ConnectionKey;
 import com.cake.struts.content.structure.GirderStrutStructureShapes;
+import com.cake.struts.registry.StrutItemTags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -14,65 +16,89 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 
 public class StrutBreakerHelper {
     private static final double MAX_BREAK_DISTANCE_SQ = 64 * 64;
 
-    public static void breakStrut(final @NotNull Player player,
-                                  final @NotNull ConnectionKey target,
-                                  final boolean isWrench) {
-        if (player.level().isClientSide()) return;
-        if (!player.mayBuild()) return;
-        if (player.distanceToSqr(Vec3.atCenterOf(target.a())) > MAX_BREAK_DISTANCE_SQ
-                && player.distanceToSqr(Vec3.atCenterOf(target.b())) > MAX_BREAK_DISTANCE_SQ) return;
-        final ServerLevel level = (ServerLevel) player.level();
-        final Set<BlockPos> anchorsToRemove = new HashSet<>();
-        if (shouldRemoveAnchor(level, target.a(), 1)) {
-            anchorsToRemove.add(target.a());
+    public static void breakStrut(final @NotNull Player player, final @NotNull ConnectionKey target) {
+        if (!(player.level() instanceof final ServerLevel level)) return;
+        if (player.isSpectator() || !player.mayBuild()) return;
+
+        final BlockPos a = target.a();
+        final BlockPos b = target.b();
+        if (a.equals(b)) return;
+        if (!level.isLoaded(a) || !level.isLoaded(b)) return;
+        if (!(level.getBlockEntity(a) instanceof final StrutBlockEntity strutA)) return;
+        if (!(level.getBlockEntity(b) instanceof final StrutBlockEntity strutB)) return;
+        if (!isConnectedTo(strutA, a, b) || !isConnectedTo(strutB, b, a)) return;
+
+        final Vec3 centerA = Vec3.atCenterOf(a);
+        final Vec3 centerB = Vec3.atCenterOf(b);
+        if (distanceToSegmentSq(player.getEyePosition(), centerA, centerB) > MAX_BREAK_DISTANCE_SQ) return;
+        if (!level.mayInteract(player, a) || !level.mayInteract(player, b)) return;
+
+        final Set<BlockPos> anchorsToRemove = new LinkedHashSet<>();
+        if (strutA.connectionCount() <= 1) {
+            anchorsToRemove.add(a);
         }
-        if (shouldRemoveAnchor(level, target.b(), 1)) {
-            anchorsToRemove.add(target.b());
+        if (strutB.connectionCount() <= 1) {
+            anchorsToRemove.add(b);
         }
-        if (!player.hasInfiniteMaterials()) {
-            final List<ItemStack> drops = collectAnchorDrops(level, anchorsToRemove);
-            for (final ItemStack stack : drops) {
-                if (!isWrench) {
-                    Block.popResource(
-                            level,
-                            BlockPos.containing(Vec3.atCenterOf(target.a()).lerp(Vec3.atCenterOf(target.b()), 0.5)),
-                            stack
-                    );
-                } else {
-                    if (!player.addItem(stack)) {
-                        Block.popResource(
-                                level,
-                                BlockPos.containing(Vec3.atCenterOf(target.a()).lerp(Vec3.atCenterOf(target.b()), 0.5)),
-                                stack
-                        );
-                    }
-                }
+        final Map<BlockPos, ItemStack> pendingDrops = player.hasInfiniteMaterials()
+                ? Map.of()
+                : collectAnchorDrops(level, anchorsToRemove);
+
+        removeConnection(level, target);
+
+        final BlockPos dropPos = BlockPos.containing(centerA.lerp(centerB, 0.5));
+        final boolean toInventory = isHoldingWrench(player);
+        for (final BlockPos anchorPos : anchorsToRemove) {
+            if (!ensureAnchorRemoved(level, anchorPos)) continue;
+            final ItemStack stack = pendingDrops.get(anchorPos);
+            if (stack == null || stack.isEmpty()) continue;
+            if (toInventory && player.addItem(stack)) continue;
+            Block.popResource(level, dropPos, stack);
+        }
+    }
+
+    private static boolean isConnectedTo(final @NotNull StrutBlockEntity strut,
+                                         final @NotNull BlockPos origin,
+                                         final @NotNull BlockPos other) {
+        for (final GirderConnectionNode node : strut.getConnectionsCopy()) {
+            if (node.absoluteFrom(origin).equals(other)) {
+                return true;
             }
         }
-        removeConnection(level, target);
-        destroyAnchors(level, anchorsToRemove);
+        return false;
     }
 
-    private static boolean shouldRemoveAnchor(final @NotNull ServerLevel level,
-                                              final @NotNull BlockPos pos,
-                                              final int removedConnections) {
-        if (!(level.getBlockEntity(pos) instanceof final StrutBlockEntity other)) {
-            return false;
+    private static double distanceToSegmentSq(final @NotNull Vec3 point,
+                                              final @NotNull Vec3 from,
+                                              final @NotNull Vec3 to) {
+        final Vec3 segment = to.subtract(from);
+        final double lengthSq = segment.lengthSqr();
+        if (lengthSq < 1.0E-6) {
+            return point.distanceToSqr(from);
         }
-        return other.connectionCount() <= removedConnections;
+        final double t = Math.clamp(point.subtract(from).dot(segment) / lengthSq, 0.0, 1.0);
+        return point.distanceToSqr(from.add(segment.scale(t)));
     }
 
-    private static @NotNull List<ItemStack> collectAnchorDrops(final @NotNull ServerLevel level,
-                                                               final @NotNull Set<BlockPos> anchorsToRemove) {
-        final List<ItemStack> drops = new ArrayList<>();
+    private static boolean isHoldingWrench(final @NotNull Player player) {
+        return isWrench(player.getMainHandItem()) || isWrench(player.getOffhandItem());
+    }
+
+    private static boolean isWrench(final @NotNull ItemStack stack) {
+        return !stack.isEmpty() && stack.is(StrutItemTags.WRENCHES);
+    }
+
+    private static @NotNull Map<BlockPos, ItemStack> collectAnchorDrops(final @NotNull ServerLevel level,
+                                                                        final @NotNull Set<BlockPos> anchorsToRemove) {
+        final Map<BlockPos, ItemStack> drops = new LinkedHashMap<>();
         for (final BlockPos anchorPos : anchorsToRemove) {
             final BlockState anchorState = level.getBlockState(anchorPos);
             if (!(anchorState.getBlock() instanceof StrutBlock)) {
@@ -81,7 +107,7 @@ public class StrutBreakerHelper {
             final Item item = anchorState.getBlock().asItem();
             final ItemStack stack = new ItemStack(item);
             if (!stack.isEmpty()) {
-                drops.add(stack);
+                drops.put(anchorPos, stack);
             }
         }
         return drops;
@@ -97,12 +123,14 @@ public class StrutBreakerHelper {
         }
     }
 
-    private static void destroyAnchors(final @NotNull ServerLevel level, final @NotNull Set<BlockPos> anchorsToRemove) {
-        for (final BlockPos anchorPos : anchorsToRemove) {
-            final BlockState anchorState = level.getBlockState(anchorPos);
-            if (anchorState.getBlock() instanceof StrutBlock) {
-                level.destroyBlock(anchorPos, false);
-            }
+    private static boolean ensureAnchorRemoved(final @NotNull ServerLevel level, final @NotNull BlockPos anchorPos) {
+        if (!(level.getBlockState(anchorPos).getBlock() instanceof StrutBlock)) {
+            return true;
         }
+        if (level.getBlockEntity(anchorPos) instanceof final StrutBlockEntity strut && strut.connectionCount() > 0) {
+            return false;
+        }
+        level.destroyBlock(anchorPos, false);
+        return !(level.getBlockState(anchorPos).getBlock() instanceof StrutBlock);
     }
 }

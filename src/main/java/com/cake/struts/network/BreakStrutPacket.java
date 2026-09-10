@@ -8,7 +8,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 
-public record BreakStrutPacket(ConnectionKey target, boolean isWrench) implements CustomPacketPayload {
+public record BreakStrutPacket(ConnectionKey target) implements CustomPacketPayload {
 
     public static final CustomPacketPayload.Type<BreakStrutPacket> TYPE =
             new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(StrutYourStuff.MOD_ID, "break_strut"));
@@ -17,9 +17,8 @@ public record BreakStrutPacket(ConnectionKey target, boolean isWrench) implement
             (buf, packet) -> {
                 buf.writeBlockPos(packet.target().a());
                 buf.writeBlockPos(packet.target().b());
-                buf.writeBoolean(packet.isWrench());
             },
-            buf -> new BreakStrutPacket(new ConnectionKey(buf.readBlockPos(), buf.readBlockPos()), buf.readBoolean())
+            buf -> new BreakStrutPacket(new ConnectionKey(buf.readBlockPos(), buf.readBlockPos()))
     );
 
     @Override

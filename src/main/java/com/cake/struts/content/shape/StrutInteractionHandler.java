@@ -134,7 +134,7 @@ public class StrutInteractionHandler {
         if (!mc.player.isShiftKeyDown() || !isActive(mc.player.getMainHandItem())) {
             return false;
         }
-        ClientPlayNetworking.send(new BreakStrutPacket(selectedKey, true));
+        ClientPlayNetworking.send(new BreakStrutPacket(selectedKey));
         resetBreakProgress(mc.level, mc.player);
         mc.player.swing(InteractionHand.MAIN_HAND);
         return true;
@@ -308,7 +308,7 @@ public class StrutInteractionHandler {
         }
 
         if (breakProgress >= 1.0F) {
-            ClientPlayNetworking.send(new BreakStrutPacket(key, false));
+            ClientPlayNetworking.send(new BreakStrutPacket(key));
             level.levelEvent(player, 2001, currentBreakPos, Block.getId(blockState));
             resetBreakProgress(level, player);
         }

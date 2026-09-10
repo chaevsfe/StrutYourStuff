@@ -12,6 +12,6 @@ public final class StrutPackets {
     public static void register() {
         PayloadTypeRegistry.serverboundPlay().register(BreakStrutPacket.TYPE, BreakStrutPacket.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(BreakStrutPacket.TYPE, (payload, context) ->
-                context.server().execute(() -> StrutBreakerHelper.breakStrut(context.player(), payload.target(), payload.isWrench())));
+                context.server().execute(() -> StrutBreakerHelper.breakStrut(context.player(), payload.target())));
     }
 }
