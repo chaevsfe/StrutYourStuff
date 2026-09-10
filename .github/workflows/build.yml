@@ -1,11 +1,6 @@
 name: Build
 
-on:
-  push:
-    branches: [fabric-26.2]
-  pull_request:
-    branches: [fabric-26.2]
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
