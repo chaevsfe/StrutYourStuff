@@ -1,5 +1,6 @@
 package com.cake.struts.content;
 
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -32,7 +33,7 @@ public interface IAntiClippedShadowLighter {
             final List<BlockPos> positions = getClosePositions(lightPosition.x, lightPosition.y, lightPosition.z);
             return positions
                     .stream()
-                    .map(p -> LightCoordsUtil.getLightCoords(getLevel(), p))
+                    .map(p -> LevelRenderer.getLightCoords(getLevel(), p))
                     .reduce(0, IAntiClippedShadowLighter::maximizeLight);
         };
     }
@@ -43,7 +44,7 @@ public interface IAntiClippedShadowLighter {
             final List<BlockPos> positions = getClosePositions(position.x, position.y, position.z);
             return positions
                     .stream()
-                    .map(p -> LightCoordsUtil.getLightCoords(getLevel(), p))
+                    .map(p -> LevelRenderer.getLightCoords(getLevel(), p))
                     .reduce(0, IAntiClippedShadowLighter::maximizeLight);
         };
     }
@@ -54,7 +55,7 @@ public interface IAntiClippedShadowLighter {
             final List<BlockPos> positions = getClosePositions(position.x, position.y, position.z);
             return positions
                     .stream()
-                    .map(p -> LightCoordsUtil.getLightCoords(be.getLevel(), p))
+                    .map(p -> LevelRenderer.getLightCoords(be.getLevel(), p))
                     .reduce(0, IAntiClippedShadowLighter::maximizeLight);
         };
     }
