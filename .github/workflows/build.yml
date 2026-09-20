@@ -35,6 +35,6 @@ jobs:
       - name: Upload jars
         uses: actions/upload-artifact@v4
         with:
-          name: struts-fabric-26.2
+          name: struts-fabric-26.1.2
           path: build/libs/*.jar
           if-no-files-found: error
