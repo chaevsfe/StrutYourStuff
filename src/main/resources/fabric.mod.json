@@ -3,7 +3,7 @@
   "id": "struts",
   "version": "${version}",
   "name": "Create Fly: Strut Your Stuff",
-  "description": "Strut Your Stuff port for Create Fly 26.2. Girder strut library for blocks that span two positions.",
+  "description": "Strut Your Stuff port for Create Fly 26.1.2. Girder strut library for blocks that span two positions.",
   "authors": [
     "Cake",
     "chaevsfe"
