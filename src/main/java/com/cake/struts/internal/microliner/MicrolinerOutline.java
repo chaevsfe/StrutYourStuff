@@ -3,6 +3,7 @@ package com.cake.struts.internal.microliner;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.cake.struts.compat.sable.math.Pose3dc;
+import com.cake.struts.internal.util.LineWidth;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,6 +38,8 @@ public interface MicrolinerOutline {
         Vec3 delta = to.subtract(from).normalize();
         delta = subLevelRenderPose != null ? subLevelRenderPose.transformNormal(delta) : delta;
 
+        final float lineWidth = LineWidth.appropriate();
+
         consumer.addVertex(last, (float) fromVertex.x, (float) fromVertex.y, (float) fromVertex.z).setColor(
                 r,
                 g,
@@ -47,7 +50,7 @@ public interface MicrolinerOutline {
                 (float) delta.x,
                 (float) delta.y,
                 (float) delta.z
-        );
+        ).setLineWidth(lineWidth);
         consumer.addVertex(last, (float) toVertex.x, (float) toVertex.y, (float) toVertex.z).setColor(
                 r,
                 g,
@@ -58,6 +61,6 @@ public interface MicrolinerOutline {
                 (float) delta.x,
                 (float) delta.y,
                 (float) delta.z
-        );
+        ).setLineWidth(lineWidth);
     }
 }

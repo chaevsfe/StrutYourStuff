@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.cake.struts.compat.sable.ClientSubLevelAccess;
 import com.cake.struts.compat.sable.math.Pose3dc;
+import com.cake.struts.internal.util.LineWidth;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -245,12 +246,16 @@ public class DefaultStrutConnectionShape implements StrutConnectionShape {
         final float bl = (color & 0xFF) / 255f;
         final float alpha = ((color >> 24) & 0xFF) / 255f;
 
+        final float lineWidth = LineWidth.appropriate();
+
         vb.addVertex(poseMatrix, (float) a.x, (float) a.y, (float) a.z)
                 .setColor(r, g, bl, alpha)
-                .setNormal(pose, nx, ny, nz);
+                .setNormal(pose, nx, ny, nz)
+                .setLineWidth(lineWidth);
         vb.addVertex(poseMatrix, (float) b.x, (float) b.y, (float) b.z)
                 .setColor(r, g, bl, alpha)
-                .setNormal(pose, nx, ny, nz);
+                .setNormal(pose, nx, ny, nz)
+                .setLineWidth(lineWidth);
     }
 
 }
