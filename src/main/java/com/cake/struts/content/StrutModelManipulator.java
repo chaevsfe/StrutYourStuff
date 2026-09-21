@@ -1,5 +1,7 @@
 package com.cake.struts.content;
 
+import com.cake.struts.StrutYourStuff;
+import com.cake.struts.content.block.StrutBlock;
 import com.cake.struts.content.cap.CapAccumulator;
 import com.cake.struts.content.geometry.StrutGeometry;
 import com.cake.struts.content.mesh.StrutMeshQuad;
@@ -14,6 +16,9 @@ import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.util.RandomSource;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.Vec3;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -31,6 +36,16 @@ import java.util.Map;
 public class StrutModelManipulator {
 
     private static final Map<StrutModelType, StrutSegmentMesh> segmentMeshes = new HashMap<>();
+    private static final Map<Identifier, PartialModel> segmentModels = new HashMap<>();
+
+    public static void prepareSegmentModels() {
+        for (final Block block : BuiltInRegistries.BLOCK) {
+            if (block instanceof final StrutBlock strutBlock) {
+                segmentModels.computeIfAbsent(strutBlock.getModelType().segmentModelLocation(), PartialModel::of);
+            }
+        }
+        StrutYourStuff.LOGGER.info("Prepared {} strut segment models", segmentModels.size());
+    }
 
     static List<StrutQuad> bakeConnection(final StrutModelBuilder.GirderConnection connection, final StrutModelType modelType) {
         if (connection.cableRenderInfo() != null) {
@@ -83,7 +98,15 @@ public class StrutModelManipulator {
     }
 
     private static List<StrutQuad> loadSegmentQuads(final StrutModelType modelType) {
-        final BlockStateModel model = PartialModel.of(modelType.segmentModelLocation()).get();
+        final PartialModel partialModel = segmentModels.get(modelType.segmentModelLocation());
+        if (partialModel == null) {
+            StrutYourStuff.LOGGER.warn("No strut segment model was prepared for {}", modelType.segmentModelLocation());
+            return List.of();
+        }
+        final BlockStateModel model = partialModel.get();
+        if (model == null) {
+            return List.of();
+        }
         final RandomSource random = RandomSource.create();
         final List<BlockStateModelPart> parts = new ArrayList<>();
         model.collectParts(random, parts);
