@@ -8,6 +8,7 @@ import com.cake.struts.content.connection.GirderConnectionNode;
 import com.cake.struts.content.structure.BlockyStrutLineGeometry;
 import com.cake.struts.content.structure.ConnectionKey;
 import com.cake.struts.internal.util.LevelSafeStorage;
+import com.cake.struts.internal.util.LineWidth;
 import com.cake.struts.network.BreakStrutPacket;
 import com.cake.struts.registry.StrutItemTags;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -370,12 +371,16 @@ public class StrutInteractionHandler {
         final float ny = len > 0 ? dy / len : 1f;
         final float nz = len > 0 ? dz / len : 0f;
 
+        final float lineWidth = LineWidth.appropriate();
+
         vb.addVertex(poseMatrix, ax, ay, az)
                 .setColor(0.0F, 0.0F, 0.0F, 0.4F)
-                .setNormal(pose.copy(), nx, ny, nz);
+                .setNormal(pose.copy(), nx, ny, nz)
+                .setLineWidth(lineWidth);
         vb.addVertex(poseMatrix, bx, by, bz)
                 .setColor(0.0F, 0.0F, 0.0F, 0.4F)
-                .setNormal(pose.copy(), nx, ny, nz);
+                .setNormal(pose.copy(), nx, ny, nz)
+                .setLineWidth(lineWidth);
     }
 
     private static void resetBreakProgress(final @Nullable ClientLevel level, final @Nullable LocalPlayer player) {
