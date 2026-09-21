@@ -34,6 +34,7 @@ public final class StrutsClient {
     }
 
     public static void init() {
+        StrutModelManipulator.prepareSegmentModels();
         StrutsFlywheelCompatLoader.bind(new FlywheelCompat());
         StrutBlockEntity.CLIENT_UPDATE_LISTENER = StrutInteractionHandler::updateOutlineShapes;
         StrutBlockEntity.CLIENT_REMOVE_LISTENER = StrutInteractionHandler::removeOutlineShapes;
