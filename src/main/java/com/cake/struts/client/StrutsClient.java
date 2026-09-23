@@ -78,7 +78,7 @@ public final class StrutsClient {
         ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> StrutInteractionHandler.clearSelection());
         ClientChunkEvents.CHUNK_UNLOAD.register((level, chunk) -> ChunkedMap.evictChunk(level, chunk.getPos()));
 
-        LevelRenderEvents.AFTER_TRANSLUCENT_TERRAIN.register(context -> {
+        LevelRenderEvents.COLLECT_SUBMITS.register(context -> {
             Microliner.get().render(context);
             StrutInteractionHandler.renderSelection(context);
         });
