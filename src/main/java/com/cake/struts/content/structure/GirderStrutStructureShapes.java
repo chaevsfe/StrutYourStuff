@@ -240,7 +240,7 @@ public class GirderStrutStructureShapes {
         }
 
         void queueRestoreFromBreak(final BlockPos pos) {
-            this.queuedRestores.add(new BlockPos(pos));
+            this.queuedRestores.add(new BlockPos(pos.getX(), pos.getY(), pos.getZ()));
         }
 
         void flushQueuedRestores(final Level level) {

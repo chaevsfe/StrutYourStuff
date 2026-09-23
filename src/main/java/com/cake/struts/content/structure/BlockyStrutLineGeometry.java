@@ -281,7 +281,7 @@ public class BlockyStrutLineGeometry {
         return BlockPos.betweenClosedStream(BlockPos.min(fromBlock, toBlock), BlockPos.max(fromBlock, toBlock))
                 .filter((block) ->
                         satLineToSquare(fromAttachment, difference, block, lineWidth, localXDirection, localYDirection))
-                .map(BlockPos::new)
+                .map(block -> new BlockPos(block.getX(), block.getY(), block.getZ()))
                 .toArray(BlockPos[]::new);
     }
 
