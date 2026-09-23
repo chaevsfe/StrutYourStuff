@@ -33,6 +33,12 @@
       "com.cake.struts.fabric.StrutsCreatePlugin"
     ]
   },
+  "mixins": [
+    {
+      "config": "struts.client.mixins.json",
+      "environment": "client"
+    }
+  ],
   "depends": {
     "minecraft": "${minecraft_dependency_version}",
     "fabricloader": ">=${fabric_loader_version}",

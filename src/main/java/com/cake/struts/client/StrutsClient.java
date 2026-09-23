@@ -16,14 +16,11 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
-import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.world.InteractionResult;
 
 import java.util.Collection;
 import java.util.Set;
@@ -88,12 +85,5 @@ public final class StrutsClient {
 
         ClientPreAttackCallback.EVENT.register((client, player, clickCount) ->
                 StrutInteractionHandler.onClientAttack());
-
-        UseBlockCallback.EVENT.register((player, level, hand, hitResult) -> {
-            if (!level.isClientSide()) {
-                return InteractionResult.PASS;
-            }
-            return StrutInteractionHandler.onClientUse(Minecraft.getInstance()) ? InteractionResult.SUCCESS : InteractionResult.PASS;
-        });
     }
 }
