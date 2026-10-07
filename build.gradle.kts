@@ -7,7 +7,7 @@ plugins {
 }
 
 group = property("maven_group") as String
-version = "${property("mod_version")}+fabric-mc${property("minecraft_version")}"
+version = "${property("mod_version")}+fly-mc${property("mc_line")}"
 
 base {
     archivesName.set(property("archives_base_name") as String)
