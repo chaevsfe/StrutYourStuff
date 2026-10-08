@@ -23,8 +23,8 @@ jobs:
 
       - name: Fetch the Create Fly Recipe Viewer jar this mod nests
         env:
-          VIEWER_JAR_NAME: CreateReiViewer-1.0.1+fly-mc26.2.jar
-          VIEWER_JAR_URL: https://github.com/chaevsfe/CreateReiViewer-Fly/releases/download/1.0.1%2Bfly-mc26.2/CreateReiViewer-1.0.1%2Bfly-mc26.2.jar
+          VIEWER_JAR_NAME: CreateReiViewer-1.0.2+fly-mc26.2.jar
+          VIEWER_JAR_URL: https://github.com/chaevsfe/CreateReiViewer-Fly/releases/download/1.0.2%2Bfly-mc26.2/CreateReiViewer-1.0.2%2Bfly-mc26.2.jar
         run: |
           mkdir -p libs
           curl -fsSL -o "libs/$VIEWER_JAR_NAME" "$VIEWER_JAR_URL"
