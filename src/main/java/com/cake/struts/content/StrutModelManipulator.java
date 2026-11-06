@@ -147,7 +147,7 @@ public class StrutModelManipulator {
             );
         }
         return new StrutQuad(vertices, quad.materialInfo().sprite(), quad.direction(),
-                quad.materialInfo().tintIndex(), quad.materialInfo().shade());
+                quad.materialInfo().tintIndex(), quad.materialInfo().shadeDirectionOverride() == null);
     }
 
     public static void invalidateMeshes() {

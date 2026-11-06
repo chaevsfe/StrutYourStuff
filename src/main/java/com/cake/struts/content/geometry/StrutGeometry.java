@@ -32,8 +32,8 @@ public class StrutGeometry {
         final float xRot = (float) Math.atan2(direction.y, distHorizontal);
         final PoseStack poseStack = new PoseStack();
         poseStack.translate(origin.x, origin.y, origin.z);
-        poseStack.mulPose(new Quaternionf().rotationY(yRot));
-        poseStack.mulPose(new Quaternionf().rotationX(-xRot));
+        poseStack.rotate(new Quaternionf().rotationY(yRot));
+        poseStack.rotate(new Quaternionf().rotationX(-xRot));
         poseStack.translate(-0.5f, -0.5f, -0.5f);
         return poseStack;
     }

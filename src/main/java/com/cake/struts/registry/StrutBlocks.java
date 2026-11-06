@@ -24,7 +24,7 @@ public class StrutBlocks {
                 .replaceable()
                 .noOcclusion()
                 .noCollision()
-                .pushReaction(PushReaction.DESTROY)
+                .pushReaction(PushReaction.POPPED)
                 .mapColor(MapColor.METAL)
                 .strength(3f, 6f)
                 .sound(SoundType.NETHERITE_BLOCK);
