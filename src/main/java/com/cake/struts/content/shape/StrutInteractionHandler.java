@@ -23,10 +23,12 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.protocol.game.ServerboundPunchPacket;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -137,8 +139,13 @@ public class StrutInteractionHandler {
         }
         ClientPlayNetworking.send(new BreakStrutPacket(selectedKey));
         resetBreakProgress(mc.level, mc.player);
-        mc.player.swing(InteractionHand.MAIN_HAND);
+        swingArm(mc.player);
         return true;
+    }
+
+    private static void swingArm(final LocalPlayer player) {
+        player.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
+        player.connection.send(ServerboundPunchPacket.INSTANCE);
     }
 
     public static void onClientTick(final Minecraft mc) {
@@ -282,7 +289,7 @@ public class StrutInteractionHandler {
                     level.getRandom(),
                     currentBreakPos
             ));
-            player.swing(InteractionHand.MAIN_HAND);
+            swingArm(player);
         }
 
         breakTicks++;
