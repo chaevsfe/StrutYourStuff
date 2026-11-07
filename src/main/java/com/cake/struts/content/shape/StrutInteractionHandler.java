@@ -18,6 +18,7 @@ import com.cake.struts.compat.sable.SableCompanion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
@@ -216,7 +217,8 @@ public class StrutInteractionHandler {
 
         final Vec3 camera = context.levelState().cameraRenderState.pos;
         final ClientLevel level = mc.level;
-        context.submitNodeCollector().submitCustomGeometry(context.poseStack(), RenderTypes.lines(), (pose, vb) -> {
+        final RenderType outlineType = mc.gameRenderer.useImprovedTransparency() ? RenderTypes.linesTranslucentNoDepthWrite() : RenderTypes.linesTranslucent();
+        context.submitNodeCollector().submitCustomGeometry(context.poseStack(), outlineType, (pose, vb) -> {
             final PoseStack ms = new PoseStack();
             ms.last().pose().set(pose.pose());
             ms.last().normal().set(pose.normal());
